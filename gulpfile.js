@@ -1,15 +1,20 @@
 const { series, parallel, src, dest, watch } = require('gulp');
 const del = require('del');
-//css
+// html
+const nunjucks = require('gulp-nunjucks-render');
+const htmlmin = require('gulp-htmlmin');
+const browserSync = require('browser-sync');
+// css
 const sass = require('gulp-sass');
 const postcss = require('gulp-postcss');
 const csso = require('gulp-csso');
 const autoprefixer = require('autoprefixer');
-//html
-const nunjucks = require('gulp-nunjucks-render');
-const htmlmin = require('gulp-htmlmin');
-const browserSync = require('browser-sync');
-//images
+// js
+const babel = require('gulp-babel');
+const sourcemaps = require('gulp-sourcemaps');
+const concat = require('gulp-concat');
+const uglify = require('gulp-uglify');
+// images
 const imagemin = require('gulp-imagemin');
 
 function serve() {
@@ -25,6 +30,8 @@ function serve() {
 
     watch('src/scss/**/*.scss', series(cssDev));
     watch('src/**/*.njk', series(htmlTplt));
+    watch('src/js/**/*.js', series(jsOld));
+    watch('src/script.js', browserSync.reload);
 }
 
 // nunjucks
@@ -68,14 +75,34 @@ function imgMin() {
         .pipe(dest('dist/img'));
 }
 
+// js transpiling
+function jsOld() {
+    return src('src/js/**/*.js')
+        .pipe(sourcemaps.init())
+        .pipe(babel())
+        .pipe(concat('script.js'))
+        .pipe(sourcemaps.write('.'))
+        .pipe(dest('src'));
+}
+
+function jsMin() {
+    return src('src/js/**/*.js')
+        .pipe(babel())
+        .pipe(concat('script.js'))
+        .pipe(uglify())
+        .pipe(dest('dist'));
+}
+
 function clean() {
-    return del(['dist', 'src/css/**/*.css', 'src/**/*.html'])
+    return del(['dist', 'src/css/**/*.css', 'src/**/*.html', 'src/script.js',
+                'src/*.map'])
 }
 
 exports.clean = series(clean);
 exports.build = series(clean, parallel(
     cssBuild,
     series(htmlTplt, htmlMinify),
+    jsMin,
     imgMin
 ));
-exports.default = series(serve);
+exports.default = series(parallel(htmlTplt, cssDev, jsOld), serve);
